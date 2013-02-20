@@ -1,0 +1,6 @@
+Revision history for Perl extension AnyEvent::Yubico.
+
+0.9.0  Wed Feb 20 12:57:23 2013
+	- original version; created by h2xs 1.23 with options
+		-AX -n AnyEvent::Yubico -v 0.9.0
+
