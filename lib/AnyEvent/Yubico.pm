@@ -165,10 +165,12 @@ sub parse_response {
 	my $body = shift;
 	my $response = {};
 
-	my @lines = split(' ', $body);
-	foreach my $line (@lines) {
-		my $index = index($line, '=');
-		$response->{substr($line, 0, $index)} = substr($line, $index+1);
+	if($body) {
+		my @lines = split(' ', $body);
+		foreach my $line (@lines) {
+			my $index = index($line, '=');
+			$response->{substr($line, 0, $index)} = substr($line, $index+1);
+		}
 	}
 
 	return $response;
