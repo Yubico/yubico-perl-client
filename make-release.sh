@@ -15,6 +15,14 @@ if [ "$(git tag | grep $PACKAGE-$VERSION)" == "$PACKAGE-$VERSION" ]; then
     exit 1
 fi
 
+PATTERN="$VERSION  $(date '+%a %b %d [0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\} %Y')"
+if [ ! "$(cat Changes | grep -e "$PATTERN")" ]; then
+    echo "Changes does not have an entry matching $VERSION with todays date."
+    echo "Make sure there is a line that has the following form:"
+    echo "$VERSION  $(date '+%a %b %d %T %Y')"
+    exit 1
+fi
+
 do_test="true"
 do_sign="true"
 
