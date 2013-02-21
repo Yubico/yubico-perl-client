@@ -1,8 +1,10 @@
 Revision history for Perl extension AnyEvent::Yubico.
 
-0.9.1  Thu Feb 21 10:36:03 2013
+0.9.1  Thu Feb 21 15:38:02 2013
 	- Added dependencies to Makefile.PL
 	- Added COPYING
+	- Made tests requiring Internet access optional
+		Disable by setting the environment variable NO_INTERNET
 
 0.9.0  Wed Feb 20 12:57:23 2013
 	- original version; created by h2xs 1.23 with options
