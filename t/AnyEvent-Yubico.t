@@ -8,7 +8,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 7;
+use Test::More tests => 6;
 use Test::Exception;
 BEGIN { use_ok('AnyEvent::Yubico') };
 
@@ -34,21 +34,29 @@ ok(defined($validator) && ref $validator eq "AnyEvent::Yubico", "new() works");
 
 is($validator->sign($test_params), $test_signature, "sign() works");
 
-is($validator->verify_sync("ccccccbhjkbulvkhvfuhlltctnjtgrvjuvcllliufiht")->{status}, "REPLAYED_OTP", "replayed OTP");
-
-is($validator->verify_sync("ccccccbhjkbubrbnrtifbiuhevinenrhtlckuctjjuuu")->{status}, "BAD_OTP", "invalid OTP");
-
 my $default_urls = $validator->{urls};
-$validator->{urls} = [ "http://example.com" ];
+$validator->{urls} = [ "http://127.0.0.1" ];
 
 dies_ok {
 	my $res = $validator->verify_async("vvgnkjjhndihvgdftlubvujrhtjnllfjneneugijhfll");
 	$res->recv();
 } 'invalid URL';
 
-#ok(1);
-
 $validator->{urls} = $default_urls;
 $validator->{local_timeout} = 0.0;
 
 is($validator->verify_sync("vvgnkjjhndihvgdftlubvujrhtjnllfjneneugijhfll")->{status}, "TIMEOUT_REACHED", "timeout");
+
+$validator->{local_timeout} = 30.0;
+
+subtest 'Tests that require access to the Internet' => sub {
+	if(exists($ENV{'NO_INTERNET'})) {
+		plan skip_all => 'Internet tests';
+	} else {
+		plan tests => 2;
+	}
+
+	is($validator->verify_sync("ccccccbhjkbulvkhvfuhlltctnjtgrvjuvcllliufiht")->{status}, "REPLAYED_OTP", "replayed OTP");
+
+	is($validator->verify_sync("ccccccbhjkbubrbnrtifbiuhevinenrhtlckuctjjuuu")->{status}, "BAD_OTP", "invalid OTP");
+};
