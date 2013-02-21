@@ -14,12 +14,12 @@ BEGIN { use_ok('AnyEvent::Yubico') };
 
 #########################
 
-# Insert your test code below, the Test::More module is use()ed here so read
-# its man page ( perldoc Test::More ) for help writing this test script.
+my $client_id = 10450;
+my $api_key = "uSzStPl2FolBbpJyDrDQxlIQElk=";
 
 my $validator = AnyEvent::Yubico->new({
-	client_id => 10450,
-	api_key => "uSzStPl2FolBbpJyDrDQxlIQElk="
+	client_id => $client_id,
+	api_key => $api_key
 });
 
 my $test_params = {
@@ -53,10 +53,20 @@ subtest 'Tests that require access to the Internet' => sub {
 	if(exists($ENV{'NO_INTERNET'})) {
 		plan skip_all => 'Internet tests';
 	} else {
-		plan tests => 2;
+		plan tests => 4;
 	}
 
 	is($validator->verify_sync("ccccccbhjkbulvkhvfuhlltctnjtgrvjuvcllliufiht")->{status}, "REPLAYED_OTP", "replayed OTP");
 
-	is($validator->verify_sync("ccccccbhjkbubrbnrtifbiuhevinenrhtlckuctjjuuu")->{status}, "BAD_OTP", "invalid OTP");
+	$validator->{api_key} = '';
+	my $result = $validator->verify_sync("ccccccbhjkbubrbnrtifbiuhevinenrhtlckuctjjuuu");
+
+	is($result->{status}, "BAD_OTP", "invalid OTP");
+
+	#Test manual signature verification
+	ok(exists($result->{h}), "signature exists");
+	my $sig = $result->{h};
+	delete $result->{h};
+	$validator->{api_key} = $api_key;
+	is($validator->sign($result), $sig, "signature is correct");
 };
