@@ -1,5 +1,5 @@
-AnyEvent-Yubico version 0.9.0
-=============================
+AnyEvent-Yubico version
+=======================
 
 AnyEvent based Perl extension for validating YubiKey OTPs.
 Though AnyEvent is used internally, the module does not impose any particular
