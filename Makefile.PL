@@ -5,7 +5,7 @@ WriteMakefile(
     NAME              => 'AnyEvent::Yubico',
     VERSION_FROM      => 'lib/AnyEvent/Yubico.pm', # finds $VERSION
     PREREQ_PM         => {
-        "AnyEvent::HTTP" => "2.14",
+        "AnyEvent::HTTP" => "2.13",
         "UUID::Tiny" => "1.0",
         "MIME::Base64" => "3.13",
         "Digest::HMAC_SHA1" => "1.02",
