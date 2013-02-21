@@ -1,5 +1,5 @@
-AnyEvent-Yubico version
-=======================
+AnyEvent-Yubico
+===============
 
 AnyEvent based Perl extension for validating YubiKey OTPs.
 Though AnyEvent is used internally, the module does not impose any particular
@@ -19,7 +19,8 @@ DEPENDENCIES
 
 This module requires these other modules and libraries:
 
-  AnyEvent::HTTP, UUID::Tiny, MIME::Base64, Digest::HMAC_SHA1, URI::Escape
+  AnyEvent::HTTP, UUID::Tiny, MIME::Base64, Digest::HMAC_SHA1, 
+  URI::Escape, Net::SSLeay
 
 COPYRIGHT AND LICENCE
 
