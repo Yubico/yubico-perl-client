@@ -34,7 +34,7 @@ sub new {
 # Verifies the given OTP and returns a true value if the OTP could be 
 # verified, false otherwise.
 sub verify {
-	return verify_async(@_)->recv->{status} == 'OK';
+	return verify_async(@_)->recv->{status} eq 'OK';
 }
 
 # Verifies the given OTP and returns a hash containing the server response.

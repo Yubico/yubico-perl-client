@@ -53,7 +53,7 @@ subtest 'Tests that require access to the Internet' => sub {
 	if(exists($ENV{'NO_INTERNET'})) {
 		plan skip_all => 'Internet tests';
 	} else {
-		plan tests => 4;
+		plan tests => 5;
 	}
 
 	is($validator->verify_sync("ccccccbhjkbulvkhvfuhlltctnjtgrvjuvcllliufiht")->{status}, "REPLAYED_OTP", "replayed OTP");
@@ -69,4 +69,6 @@ subtest 'Tests that require access to the Internet' => sub {
 	delete $result->{h};
 	$validator->{api_key} = $api_key;
 	is($validator->sign($result), $sig, "signature is correct");
+
+	ok(! $validator->verify("ccccccbhjkbubrbnrtifbiuhevinenrhtlckuctjjuuu"), "verify(\$bad_otp)");
 };
