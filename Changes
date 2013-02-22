@@ -1,6 +1,9 @@
 Revision history for Perl extension AnyEvent::Yubico.
 
-0.9.2  unreleased
+0.9.2  Fri Feb 22 14:09:06 2013
+	- Fixed bug preventing verify from working.
+	- Lowered the required version of AnyEvent::HTTP to ensure that
+	  all dependencies are available on Ubuntu 12.04
 
 0.9.1  Thu Feb 21 15:38:02 2013
 	- Added dependencies to Makefile.PL
