@@ -58,7 +58,10 @@ subtest 'Tests that require access to the Internet' => sub {
 
 	is($validator->verify_sync("ccccccbhjkbulvkhvfuhlltctnjtgrvjuvcllliufiht")->{status}, "REPLAYED_OTP", "replayed OTP");
 
-	$validator->{api_key} = '';
+	$validator = AnyEvent::Yubico->new({
+		client_id => $client_id,
+	});
+
 	my $result = $validator->verify_sync("ccccccbhjkbubrbnrtifbiuhevinenrhtlckuctjjuuu");
 
 	is($result->{status}, "BAD_OTP", "invalid OTP");
