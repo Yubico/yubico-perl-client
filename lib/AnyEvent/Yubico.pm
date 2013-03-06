@@ -7,7 +7,7 @@ use MIME::Base64;
 use Digest::HMAC_SHA1 qw(hmac_sha1);
 use URI::Escape;
 
-our $VERSION = '0.9.2';
+our $VERSION = '0.9.3';
 
 # Creates a new Yubico instance to be used for validation of OTPs.
 sub new {
