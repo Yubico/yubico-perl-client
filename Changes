@@ -1,5 +1,7 @@
 Revision history for Perl extension AnyEvent::Yubico.
 
+0.9.4  unreleased
+
 0.9.3  Wed Mar 06 11:31:03 2013
 	- Replaced usage of AnyEvent->timer for timeouts with setting
 	  the timeout parameter for each HTTP connection, as the timer
