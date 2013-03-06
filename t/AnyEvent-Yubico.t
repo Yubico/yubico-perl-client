@@ -8,7 +8,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 6;
+use Test::More tests => 5;
 use Test::Exception;
 BEGIN { use_ok('AnyEvent::Yubico') };
 
@@ -40,18 +40,17 @@ $validator->{urls} = [ "http://127.0.0.1:0" ];
 is($validator->verify_async("vvgnkjjhndihvgdftlubvujrhtjnllfjneneugijhfll")->recv()->{status}, "Connection refused", "invalid URL");
 
 $validator->{urls} = $default_urls;
-$validator->{local_timeout} = 0.01;
-
-is($validator->verify_sync("vvgnkjjhndihvgdftlubvujrhtjnllfjneneugijhfll")->{status}, "Connection timed out", "timeout");
-
-$validator->{local_timeout} = 30.0;
 
 subtest 'Tests that require access to the Internet' => sub {
 	if(exists($ENV{'NO_INTERNET'})) {
 		plan skip_all => 'Internet tests';
 	} else {
-		plan tests => 5;
+		plan tests => 6;
 	}
+
+	$validator->{local_timeout} = 0.01;
+	is($validator->verify_sync("vvgnkjjhndihvgdftlubvujrhtjnllfjneneugijhfll")->{status}, "Connection timed out", "timeout");
+	$validator->{local_timeout} = 30.0;
 
 	is($validator->verify_sync("ccccccbhjkbulvkhvfuhlltctnjtgrvjuvcllliufiht")->{status}, "REPLAYED_OTP", "replayed OTP");
 
