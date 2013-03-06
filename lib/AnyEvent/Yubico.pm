@@ -78,7 +78,6 @@ sub verify_async {
 	
 	my $last_response;
 	my @requests = ();
-	my $timer;
 	my $result_var = AnyEvent->condvar(cb => $callback);
 	my $inner_var = AnyEvent->condvar(cb => sub {
 		my $result = shift->recv;
@@ -86,7 +85,6 @@ sub verify_async {
 		foreach my $req (@requests) {
 			undef $req;
 		}
-		undef $timer;
 
 		if(exists $result->{status}) {
 			$result_var->send($result);
@@ -99,14 +97,22 @@ sub verify_async {
 		}
 	});
 
-	$timer = AnyEvent->timer(after => $self->{local_timeout}, cb => sub {
-		$inner_var->send({ status => "TIMEOUT_REACHED" });
-	});
-
 	foreach my $url (@{$self->{urls}}) {
 		$inner_var->begin();
-		push(@requests, http_get("$url$query", tls_ctx => 'high', sub {
+		push(@requests, http_get("$url$query", 
+				timeout => $self->{local_timeout}, 
+				tls_ctx => 'high', 
+				sub {
 			my($body, $hdr) = @_;
+
+			if(not $hdr->{Status} =~ /^2/) {
+				#Error, store message if none exists.
+				if(not exists $last_response->{status}) {
+					$last_response->{status} = $hdr->{Reason};
+				}
+				$inner_var->end();
+				return;
+			}
 
 			my $response = parse_response($body);
 

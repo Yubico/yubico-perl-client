@@ -35,17 +35,14 @@ ok(defined($validator) && ref $validator eq "AnyEvent::Yubico", "new() works");
 is($validator->sign($test_params), $test_signature, "sign() works");
 
 my $default_urls = $validator->{urls};
-$validator->{urls} = [ "http://127.0.0.1" ];
+$validator->{urls} = [ "http://127.0.0.1:0" ];
 
-dies_ok {
-	my $res = $validator->verify_async("vvgnkjjhndihvgdftlubvujrhtjnllfjneneugijhfll");
-	$res->recv();
-} 'invalid URL';
+is($validator->verify_async("vvgnkjjhndihvgdftlubvujrhtjnllfjneneugijhfll")->recv()->{status}, "Connection refused", "invalid URL");
 
 $validator->{urls} = $default_urls;
-$validator->{local_timeout} = 0.0;
+$validator->{local_timeout} = 0.01;
 
-is($validator->verify_sync("vvgnkjjhndihvgdftlubvujrhtjnllfjneneugijhfll")->{status}, "TIMEOUT_REACHED", "timeout");
+is($validator->verify_sync("vvgnkjjhndihvgdftlubvujrhtjnllfjneneugijhfll")->{status}, "Connection timed out", "timeout");
 
 $validator->{local_timeout} = 30.0;
 
