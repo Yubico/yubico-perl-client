@@ -1,0 +1,7 @@
+Author: Yubico
+Basename: yubico-perl-client
+Homepage: http://opensource.yubico.com/yubico-perl-client/
+License: BSD-2-Clause
+Name: yubico-perl-client
+Project: yubico-perl-client
+Summary: AnyEvent based Perl extension for validating YubiKey OTPs against the Yubico Validation Protocol version 2.0
