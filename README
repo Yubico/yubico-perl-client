@@ -5,6 +5,9 @@ Though AnyEvent is used internally, the module does not impose any particular
 coding style on the caller. Provides both blocking and non-blocking versions
 of OTP verification.
 
+For more details on how to use YubiKey OTP libraries, visit
+https://developers.yubico.com/OTP[developers.yubico.com/OTP].
+
 === Installation
 
 To install this module type the following:
