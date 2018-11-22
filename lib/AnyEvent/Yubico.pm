@@ -256,8 +256,8 @@ Example:
       client_id => ...,
       api_key => ...,
       urls => [
-          "http://example.com/wsapi/2.0/verify",
-          "http://127.0.0.1/wsapi/2.0/verify"
+          "https://example.com/wsapi/2.0/verify",
+          "https://127.0.0.1/wsapi/2.0/verify"
       ]
   });
 
@@ -294,7 +294,7 @@ The Yubico Validation Protocol 2.0 specification:
 https://github.com/Yubico/yubikey-val/wiki/ValidationProtocolV20
 
 More information about the YubiKey:
-http://www.yubico.com
+https://www.yubico.com
 
 =head1 AUTHOR
 
