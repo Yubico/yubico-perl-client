@@ -15,13 +15,8 @@ sub new {
 	my $self = {
 		sign_request => 1,
 		local_timeout => 30.0,
-		urls => [
-			"https://api.yubico.com/wsapi/2.0/verify",
-			"https://api2.yubico.com/wsapi/2.0/verify",
-			"https://api3.yubico.com/wsapi/2.0/verify",
-			"https://api4.yubico.com/wsapi/2.0/verify",
-			"https://api5.yubico.com/wsapi/2.0/verify"
-		]
+		max_retries => 3,
+		url => "https://api.yubico.com/wsapi/2.0/verify",
 	};
 
 	my $options = shift;
@@ -76,7 +71,6 @@ sub verify_async {
     	}
 	$query = "?".substr($query, 1);
 	
-	my $last_response;
 	my @requests = ();
 	my $result_var = AnyEvent->condvar(cb => $callback);
 	my $inner_var = AnyEvent->condvar(cb => sub {
@@ -86,66 +80,70 @@ sub verify_async {
 			undef $req;
 		}
 
-		if(exists $result->{status}) {
-			$result_var->send($result);
-		} elsif(exists $last_response->{status}) {
-			#All responses returned replayed request.
-			$result_var->send($last_response);
-		} else {
-			#Didn't get any valid responses.
-			$result_var->croak("No valid response!");
-		}
+		$result_var->send($result);
 	});
 
-	foreach my $url (@{$self->{urls}}) {
-		$inner_var->begin();
-		push(@requests, http_get("$url$query", 
-				timeout => $self->{local_timeout}, 
-				tls_ctx => 'high', 
-				sub {
-			my($body, $hdr) = @_;
+	my $url = $self->{url};
+	$inner_var->begin();
 
-			if(not $hdr->{Status} =~ /^2/) {
-				#Error, store message if none exists.
-				if(not exists $last_response->{status}) {
-					$last_response->{status} = $hdr->{Reason};
-				}
-				$inner_var->end();
+	my $retries = 0;
+	my $response_callback;
+	$response_callback = sub {
+		my($body, $hdr) = @_;
+
+		my $response = parse_response($body);
+
+		if(not $hdr->{Status} =~ /^2/) {
+			#Error, see if we should retry
+
+			if ($hdr->{Status} eq '429') {
+				$inner_var->send({status => 'RATE_LIMITED'});
 				return;
 			}
+			if ($hdr->{Status} eq '400' or
+			    $hdr->{Status} =~ /^5/) {
+				if ($retries > $self->{max_retries}) {
+					$inner_var->send({status => $hdr->{Reason}});
+					return;
+				}
 
-			my $response = parse_response($body);
-
-			if(! exists $response->{status}) {
-				#Response does not look valid, discard.
-				$inner_var->end();
+				$retries++;
+				push(@requests, http_get("$url$query",
+						timeout => $self->{local_timeout},
+						tls_ctx => 'high',
+						$response_callback));
 				return;
 			}
+		}
 
-			if(! $self->{api_key} eq '') {
-				my $signature = $response->{h};
-				delete $response->{h};
-				if(! $signature eq $self->sign($response)) {
-					$response->{status} = "BAD_RESPONSE_SIGNATURE";
-				}
-			}
+		if(! exists $response->{status}) {
+			#Response does not look valid, discard.
+			$result_var->croak("Response without a status");
+			return;
+		}
 
-			$last_response = $response;
-
-			if($response->{status} eq "REPLAYED_REQUEST") {
-				#Replayed request, wait for next.
-				$inner_var->end();
-			} else {
-				#Definitive response, return it.
-				if($response->{status} eq "OK") {
-					$inner_var->croak("Response nonce does not match!") if(! $nonce eq $response->{nonce});
-					$inner_var->croak("Response OTP does not match!") if(! $otp eq $response->{otp});
-				}
-
+		if(! $self->{api_key} eq '') {
+			my $signature = $response->{h};
+			delete $response->{h};
+			if(! $signature eq $self->sign($response)) {
+				$response->{status} = "BAD_RESPONSE_SIGNATURE";
 				$inner_var->send($response);
 			}
-		}));
-	}
+		}
+
+		#Definitive response, return it.
+		if($response->{status} eq "OK") {
+			$inner_var->croak("Response nonce does not match!") if(! $nonce eq $response->{nonce});
+			$inner_var->croak("Response OTP does not match!") if(! $otp eq $response->{otp});
+		}
+
+		$inner_var->send($response);
+	};
+
+	push(@requests, http_get("$url$query",
+			timeout => $self->{local_timeout},
+			tls_ctx => 'high',
+			$response_callback));
 
 	return $result_var;
 };
