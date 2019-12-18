@@ -102,12 +102,12 @@ sub verify_async {
 			}
 			if ($hdr->{Status} eq '400' or
 			    $hdr->{Status} =~ /^5/) {
+				$retries++;
 				if ($retries > $self->{max_retries}) {
 					$inner_var->send({status => $hdr->{Reason}});
 					return;
 				}
 
-				$retries++;
 				push(@requests, http_get("$url$query",
 						timeout => $self->{local_timeout},
 						tls_ctx => 'high',
