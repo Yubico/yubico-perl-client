@@ -8,7 +8,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 7;
+use Test::More tests => 11;
 use Test::Exception;
 require Test::MockModule;
 BEGIN { use_ok('AnyEvent::Yubico') };
@@ -35,8 +35,17 @@ ok(defined($validator) && ref $validator eq "AnyEvent::Yubico", "new() works");
 
 is($validator->sign($test_params), $test_signature, "sign() works");
 
-my $default_url = $validator->{url};
-$validator->{url} = "http://127.0.0.1:0";
+my $default_urls = $validator->{urls};
+
+$validator->{urls} = ["url_one", "url_two"];
+
+is($validator->next_url(), "url_one", "next url cycles");
+is($validator->next_url(), "url_two", "next url cycles");
+is($validator->next_url(), "url_one", "next url cycles");
+
+$validator->{urls} = ["http://127.0.0.1:0"];
+
+is($validator->next_url(), "http://127.0.0.1:0", "next_url works after changin urls");
 
 is($validator->verify_async("vvgnkjjhndihvgdftlubvujrhtjnllfjneneugijhfll")->recv()->{status}, "Connection refused", "invalid URL");
 
@@ -44,7 +53,7 @@ $validator->{local_timeout} = 0.0001;
 
 is($validator->verify_sync("vvgnkjjhndihvgdftlubvujrhtjnllfjneneugijhfll")->{status}, "Connection timed out", "timeout");
 
-$validator->{url} = $default_url;
+$validator->{urls} = $default_urls;
 $validator->{local_timeout} = 30.0;
 
 subtest 'Tests that require access to the Internet' => sub {

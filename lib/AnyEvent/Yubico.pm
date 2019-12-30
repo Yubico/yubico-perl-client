@@ -7,7 +7,7 @@ use MIME::Base64;
 use Digest::HMAC_SHA1 qw(hmac_sha1);
 use URI::Escape;
 
-our $VERSION = '0.9.4';
+our $VERSION = '0.10.0';
 
 # Creates a new Yubico instance to be used for validation of OTPs.
 sub new {
@@ -16,7 +16,8 @@ sub new {
 		sign_request => 1,
 		local_timeout => 30.0,
 		max_retries => 3,
-		url => "https://api.yubico.com/wsapi/2.0/verify",
+		urls => ["https://api.yubico.com/wsapi/2.0/verify"],
+		_url_index => 0,
 	};
 
 	my $options = shift;
@@ -25,6 +26,20 @@ sub new {
 
 	return bless $self, $class;
 };
+
+# Gets the next URL to try
+sub next_url {
+	my ($self) = @_;
+        # Do the beyond-end-of-list check first, just in case
+        # someone's changed the list of URLs since last time we asked
+        # for the next URL.
+	if ($self->{_url_index} > scalar(@{$self->{urls}}) - 1) {
+		$self->{_url_index} = 0;
+	}
+	my $url = $self->{urls}[$self->{_url_index}];
+	$self->{_url_index}++;
+        return $url;
+}
 
 # Verifies the given OTP and returns a true value if the OTP could be 
 # verified, false otherwise.
@@ -83,7 +98,7 @@ sub verify_async {
 		$result_var->send($result);
 	});
 
-	my $url = $self->{url};
+	my $url = $self->next_url();
 	$inner_var->begin();
 
 	my $retries = 0;
@@ -108,6 +123,7 @@ sub verify_async {
 					return;
 				}
 
+				$url = $self->next_url();
 				push(@requests, http_get("$url$query",
 						timeout => $self->{local_timeout},
 						tls_ctx => 'high',
