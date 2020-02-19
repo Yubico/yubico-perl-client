@@ -8,8 +8,9 @@
 use strict;
 use warnings;
 
-use Test::More tests => 6;
+use Test::More tests => 7;
 use Test::Exception;
+require Test::MockModule;
 BEGIN { use_ok('AnyEvent::Yubico') };
 
 #########################
@@ -35,7 +36,8 @@ ok(defined($validator) && ref $validator eq "AnyEvent::Yubico", "new() works");
 is($validator->sign($test_params), $test_signature, "sign() works");
 
 my $default_urls = $validator->{urls};
-$validator->{urls} = [ "http://127.0.0.1:0" ];
+
+$validator->{urls} = ["http://127.0.0.1:0"];
 
 is($validator->verify_async("vvgnkjjhndihvgdftlubvujrhtjnllfjneneugijhfll")->recv()->{status}, "Connection refused", "invalid URL");
 
@@ -57,6 +59,11 @@ subtest 'Tests that require access to the Internet' => sub {
 
 	$validator = AnyEvent::Yubico->new({
 		client_id => $client_id,
+                urls => [ "https://api.yubico.com/wsapi/2.0/verify",
+                          "https://api.yubico.com/wsapi/2.0/verify",
+                          "https://api.yubico.com/wsapi/2.0/verify",
+                          "https://api.yubico.com/wsapi/2.0/verify",
+                          "https://api.yubico.com/wsapi/2.0/verify" ]
 	});
 
 	my $result = $validator->verify_sync("ccccccbhjkbubrbnrtifbiuhevinenrhtlckuctjjuuu");
@@ -71,4 +78,56 @@ subtest 'Tests that require access to the Internet' => sub {
 	is($validator->sign($result), $sig, "signature is correct");
 
 	ok(! $validator->verify("ccccccbhjkbubrbnrtifbiuhevinenrhtlckuctjjuuu"), "verify(\$bad_otp)");
+};
+
+subtest 'HTTP error tests' => sub {
+    plan tests => 4;
+
+    my @mocked_responses = ();
+    # AnyEvent::Yubico `use`es AnyEvent::HTTP to get http_get
+    my $mock_anyevent_http = Test::MockModule->new('AnyEvent::Yubico');
+    $mock_anyevent_http->redefine('http_get', sub {
+        my $callback = pop;
+        my $response = pop @mocked_responses;
+        $callback->($response->{body}, $response->{head});
+    });
+
+    my $error_response = { body => "Nope.", head => { Status => 500, Reason => 'Internal Server Error' } };
+    my $ratelimit_response = { body => "Nope.", head => { Status => 429 } };
+    my $almostok_response = { body => "status=OK", head => { Status => 200 } };
+
+    push @mocked_responses, $ratelimit_response;
+
+    my $result = $validator->verify_sync("ccccccbhjkbubrbnrtifbiuhevinenrhtlckuctjjuuu");
+    is($result->{status}, "RATE_LIMITED", "detect rate limiting");
+
+    push @mocked_responses, $ratelimit_response;
+    push @mocked_responses, $almostok_response;
+    push @mocked_responses, $error_response;
+    push @mocked_responses, $error_response;
+
+    # Disable checking signature because I CBF calculating it for the test
+    $validator->{api_key} = '';
+
+    # This throws a response nonce mismatch, which is correct because
+    # the mocked response has no nonce. It's too annoying to grab that
+    # nonce in the mock, and it's good to validate that we do error
+    # when the nonce doesn't match anyway.
+    throws_ok { $validator->verify_sync("ccccccbhjkbubrbnrtifbiuhevinenrhtlckuctjjuuu"); } qr/Response nonce does not match/, "Retry works, as does nonce checking";
+
+    # Just to make sure that the 500s are being retried rather than us
+    # mocking the responses in the wrong order
+    $result = $validator->verify_sync("ccccccbhjkbubrbnrtifbiuhevinenrhtlckuctjjuuu");
+    is($result->{status}, "RATE_LIMITED", "double check the retrying mock works");
+
+
+    # 3 retries means give up after 4th error
+    push @mocked_responses, $almostok_response;
+    push @mocked_responses, $error_response;
+    push @mocked_responses, $error_response;
+    push @mocked_responses, $error_response;
+    push @mocked_responses, $error_response;
+
+    $result = $validator->verify_sync("ccccccbhjkbubrbnrtifbiuhevinenrhtlckuctjjuuu");
+    is($result->{status}, "Internal Server Error", "Retries are limited");
 };
