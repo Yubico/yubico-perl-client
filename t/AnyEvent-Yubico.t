@@ -8,7 +8,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 11;
+use Test::More tests => 7;
 use Test::Exception;
 require Test::MockModule;
 BEGIN { use_ok('AnyEvent::Yubico') };
@@ -37,15 +37,7 @@ is($validator->sign($test_params), $test_signature, "sign() works");
 
 my $default_urls = $validator->{urls};
 
-$validator->{urls} = ["url_one", "url_two"];
-
-is($validator->next_url(), "url_one", "next url cycles");
-is($validator->next_url(), "url_two", "next url cycles");
-is($validator->next_url(), "url_one", "next url cycles");
-
 $validator->{urls} = ["http://127.0.0.1:0"];
-
-is($validator->next_url(), "http://127.0.0.1:0", "next_url works after changin urls");
 
 is($validator->verify_async("vvgnkjjhndihvgdftlubvujrhtjnllfjneneugijhfll")->recv()->{status}, "Connection refused", "invalid URL");
 
@@ -67,6 +59,11 @@ subtest 'Tests that require access to the Internet' => sub {
 
 	$validator = AnyEvent::Yubico->new({
 		client_id => $client_id,
+                urls => [ "https://api.yubico.com/wsapi/2.0/verify",
+                          "https://api.yubico.com/wsapi/2.0/verify",
+                          "https://api.yubico.com/wsapi/2.0/verify",
+                          "https://api.yubico.com/wsapi/2.0/verify",
+                          "https://api.yubico.com/wsapi/2.0/verify" ]
 	});
 
 	my $result = $validator->verify_sync("ccccccbhjkbubrbnrtifbiuhevinenrhtlckuctjjuuu");

@@ -17,7 +17,6 @@ sub new {
 		local_timeout => 30.0,
 		max_retries => 3,
 		urls => ["https://api.yubico.com/wsapi/2.0/verify"],
-		_url_index => 0,
 	};
 
 	my $options = shift;
@@ -26,20 +25,6 @@ sub new {
 
 	return bless $self, $class;
 };
-
-# Gets the next URL to try
-sub next_url {
-	my ($self) = @_;
-        # Do the beyond-end-of-list check first, just in case
-        # someone's changed the list of URLs since last time we asked
-        # for the next URL.
-	if ($self->{_url_index} > scalar(@{$self->{urls}}) - 1) {
-		$self->{_url_index} = 0;
-	}
-	my $url = $self->{urls}[$self->{_url_index}];
-	$self->{_url_index}++;
-        return $url;
-}
 
 # Verifies the given OTP and returns a true value if the OTP could be 
 # verified, false otherwise.
@@ -86,6 +71,7 @@ sub verify_async {
     	}
 	$query = "?".substr($query, 1);
 	
+	my $last_response;
 	my @requests = ();
 	my $result_var = AnyEvent->condvar(cb => $callback);
 	my $inner_var = AnyEvent->condvar(cb => sub {
@@ -95,72 +81,94 @@ sub verify_async {
 			undef $req;
 		}
 
-		$result_var->send($result);
-	});
-
-	my $url = $self->next_url();
-	$inner_var->begin();
-
-	my $retries = 0;
-	my $response_callback;
-	$response_callback = sub {
-		my($body, $hdr) = @_;
-
-		my $response = parse_response($body);
-
-		if(not $hdr->{Status} =~ /^2/) {
-			#Error, see if we should retry
-
-			if ($hdr->{Status} eq '429') {
-				$inner_var->send({status => 'RATE_LIMITED'});
-				return;
-			}
-			if ($hdr->{Status} eq '400' or
-			    $hdr->{Status} =~ /^5/) {
-				$retries++;
-				if ($retries > $self->{max_retries}) {
-					$inner_var->send({status => $hdr->{Reason}});
-					return;
-				}
-
-				$url = $self->next_url();
-				push(@requests, http_get("$url$query",
-						timeout => $self->{local_timeout},
-						tls_ctx => 'high',
-						$response_callback));
-				return;
-			}
-		}
-
-		if(! exists $response->{status}) {
-			#Response does not look valid, discard.
-			$result_var->croak("Response without a status");
+		if (exists $result->{status}) {
+			$result_var->send($result);
+			return;
+		} elsif (exists $last_response->{status}) {
+			# All responses returned replayed request.
+			$result_var->send($last_response);
 			return;
 		}
 
-		if(! $self->{api_key} eq '') {
-			my $signature = $response->{h};
-			delete $response->{h};
-			if(! $signature eq $self->sign($response)) {
-				$response->{status} = "BAD_RESPONSE_SIGNATURE";
+		# No valid responses
+		$result_var->croak("No valid response!");
+	});
+
+	my $retries = {};
+        my $response_callbacks = {};
+
+	foreach my $url (@{$self->{urls}}) {
+		$retries->{$url} = 0;
+		$response_callbacks->{$url} = sub {
+			my($body, $hdr) = @_;
+
+			my $response = parse_response($body);
+
+			if(not $hdr->{Status} =~ /^2/) {
+				# Error, see if we should retry
+
+				if ($hdr->{Status} eq '429') {
+					$inner_var->send({status => 'RATE_LIMITED'});
+					return;
+				}
+				if ($hdr->{Status} eq '400' or
+				    $hdr->{Status} =~ /^5/) {
+					$retries->{$url}++;
+					if ($retries->{$url} > $self->{max_retries}) {
+						$inner_var->send({status => $hdr->{Reason}});
+						return;
+					}
+
+					push(@requests, http_get("$url$query",
+								 timeout => $self->{local_timeout},
+								 tls_ctx => 'high',
+								 $response_callbacks->{$url}));
+					return;
+				}
+
+				# Non-retryable error
+				$last_response = {status => $hdr->{Reason}};
+				$inner_var->end();
+				return;
+			}
+
+			if(! exists $response->{status}) {
+				# Response does not look valid, discard.
+				$inner_var->end();
+				return;
+			}
+
+			if(! $self->{api_key} eq '') {
+				my $signature = $response->{h};
+				delete $response->{h};
+				if(! $signature eq $self->sign($response)) {
+					$response->{status} = "BAD_RESPONSE_SIGNATURE";
+					$inner_var->send($response);
+				}
+			}
+
+			$last_response = $response;
+
+			if ($response->{status} eq "REPLAYED_REQUEST") {
+				# Replayed Request, wait for an OK from a different server
+				$inner_var->end();
+			} else {
+				# Definitive response, return it.
+				if ($response->{status} eq "OK") {
+					$inner_var->croak("Response nonce does not match!") if(! $nonce eq $response->{nonce});
+					$inner_var->croak("Response OTP does not match!") if(! $otp eq $response->{otp});
+				}
+
 				$inner_var->send($response);
 			}
-		}
+		};
 
-		#Definitive response, return it.
-		if($response->{status} eq "OK") {
-			$inner_var->croak("Response nonce does not match!") if(! $nonce eq $response->{nonce});
-			$inner_var->croak("Response OTP does not match!") if(! $otp eq $response->{otp});
-		}
-
-		$inner_var->send($response);
-	};
-
-	push(@requests, http_get("$url$query",
-			timeout => $self->{local_timeout},
-			tls_ctx => 'high',
-			$response_callback));
-
+		$inner_var->begin();
+		push(@requests, http_get("$url$query",
+					 timeout => $self->{local_timeout},
+					 tls_ctx => 'high',
+					 $response_callbacks->{$url}));
+	}
 	return $result_var;
 };
 
