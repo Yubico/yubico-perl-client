@@ -1,5 +1,7 @@
 == AnyEvent-Yubico ==
 
+NOTE: This project is deprecated and is no longer being maintained. For more information and guidance on how to implement Yubico OTP support in applications, see https://status.yubico.com/2021/04/15/one-api-yubico-com-one-http-get/.
+
 AnyEvent based Perl module for validating YubiKey OTPs.
 Though AnyEvent is used internally, the module does not impose any particular
 coding style on the caller. Provides both blocking and non-blocking versions
